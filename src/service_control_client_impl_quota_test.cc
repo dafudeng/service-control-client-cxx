@@ -268,14 +268,19 @@ TEST_F(ServiceControlClientImplQuotaTest, TestCachedQuotaRefreshGotHTTPError) {
   Status cancelledError = CancelledError("cancelled error");
   mock_quota_transport_.done_status_ = cancelledError;
 
-  // Wait 600ms to trigger the next quota refresh
+  // Wait 600ms to let the cached response expire.
+  // This sleep will not trigger a remote quota call since test did not provide
+  // a timer object. The refresh remote quota call is triggered by cache lookup
+  // in the "Quota" call, for an expired entry, if it has aggregated cost or it
+  // is negative, make a remote quota call.
   std::this_thread::sleep_for(std::chrono::milliseconds(600));
 
-  // Next Quota call reads the cached negative response, and triggers
-  // the quota cache refresh.
+  // Next Quota call reads the cached negative response, QUOTA_EXHAUSTED, and
+  // triggers the quota cache refresh. The CancelledError response will be
+  // cached after this.
   cached_client_->Quota(quota_request1_, &quota_response,
       [&done_status](Status status) { done_status = status; });
-  // Check the cached response is the first negative response - QUOTA_EXHAUSTED.
+  // Check the cached response is the first cached response - QUOTA_EXHAUSTED.
   EXPECT_EQ(quota_response.allocate_errors_size(), 1);
   EXPECT_EQ(quota_response.allocate_errors()[0].code(),
             error_quota_response1_.allocate_errors[0].code());
@@ -288,11 +293,12 @@ TEST_F(ServiceControlClientImplQuotaTest, TestCachedQuotaRefreshGotHTTPError) {
   // response.
   mock_quota_transport_.done_status_ = absl::InternalError("internal error");
 
-  // Wait 600ms to trigger the next quota refresh
+  // Wait 600ms to let the cached response expire.
   std::this_thread::sleep_for(std::chrono::milliseconds(600));
 
-  // Read the CancelledError response from the cache, and trigger another
-  // quota cache refresh.
+  // Read the previously cached CancelledError response, since it is a negative
+  // response, it will trigger a new remote quota call. The new fail-open InternalError
+  // response will be cached right after.
   cached_client_->Quota(
       quota_request1_, &quota_response,
       [&done_status](Status status) { done_status = status; });

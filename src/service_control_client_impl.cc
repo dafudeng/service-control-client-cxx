@@ -159,13 +159,17 @@ void ServiceControlClientImpl::AllocateQuotaFlushCallback(
                          *quota_request_copy, *quota_response);
                      } else if (IsQuotaFailOpenError(status)) {
                        // Cache dummy response for fail open.
-                       LOG(ERROR) << "Failed in AllocateQuota call: " << status.message();
+                       GOOGLE_LOG(ERROR) << "Failed in AllocateQuota call: "
+                                         << status.message()
+                                         << ", but treated as fail-open";
                        AllocateQuotaResponse dummy_response;
                        (void)this->quota_aggregator_->CacheResponse(
                          *quota_request_copy, dummy_response);
                      } else {
                        // Cache error response for fail close.
-                       LOG(ERROR) << "Failed in AllocateQuota call: " << status.message();
+                       GOOGLE_LOG(ERROR) << "Failed in AllocateQuota call: "
+                                         << status.message()
+                                         << << ", treated as fail-close";;
                        AllocateQuotaResponse error_response;
                        QuotaError client_side_error;
                        *client_side_error.mutable_status() = util::SaveStatusAsRpcStatus(status);
